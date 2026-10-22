@@ -33,6 +33,7 @@
     <div id="hud">
       <button id="walkButton">あるく</button>
       <button id="danceButton">おどる</button>
+      <button id="punchButton">おこる</button>
     </div>
 
     <a-scene embedded arjs="sourceType: webcam">
@@ -55,6 +56,7 @@
       const robot = document.getElementById("robot");
       const walkButton = document.getElementById("walkButton");
       const danceButton = document.getElementById("danceButton");
+      const punchButton = document.getElementById("punchButton");
 
       function walkAnimation() {
         robot.setAttribute(
@@ -72,8 +74,17 @@
         );
       }
 
+      function punchAnimation() {
+        robot.setAttribute(
+          "animation-mixer",
+          "clip",
+          "RobotArmature|Robot_Punch",
+        );
+      }
+
       walkButton.addEventListener("click", walkAnimation);
       danceButton.addEventListener("click", danceAnimation);
+      punchButton.addEventListener("click", punchAnimation);
     </script>
   </body>
 </html>
