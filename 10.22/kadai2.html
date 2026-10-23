@@ -38,7 +38,26 @@
   <body>
     <div id="hud">
       <select id="animationSelect">
-        <option value="">Memuat animasi</option>
+        <option
+          value="CharacterArmature|CharacterArmature|CharacterArmature|No|CharacterArmature|No"
+        >
+          なし
+        </option>
+        <option
+          value="CharacterArmature|CharacterArmature|CharacterArmature|Run|CharacterArmature|Run"
+        >
+          ランニング
+        </option>
+        <option
+          value="CharacterArmature|CharacterArmature|CharacterArmature|Sword|CharacterArmature|Swo"
+        >
+          剣
+        </option>
+        <option
+          value="CharacterArmature|CharacterArmature|CharacterArmature|Jump|CharacterArmature|Jump"
+        >
+          ジャンプ
+        </option>
       </select>
       <button id="enlargeButton">拡大</button>
       <button id="shrinkButton">縮小</button>
@@ -50,12 +69,12 @@
       <a-marker preset="hiro" smooth="true">
         <a-entity id="model" position="0 0 0.5">
           <a-gltf-model
-            id="Character"
+            id="Anne"
             src="Anne.glb"
             position="0 0 0"
             scale="0.3 0.3 0.3"
             rotation="-90 0 0"
-            animation-mixer="clip: CharacterArmature|Character_Walking"
+            animation-mixer="clip: AnneArmature|Anne_Walking"
           >
           </a-gltf-model>
         </a-entity>
@@ -65,7 +84,7 @@
     </a-scene>
 
     <script>
-      const Character = document.getElementById("Character");
+      const Anne = document.getElementById("Anne");
       const animationSelect = document.getElementById("animationSelect");
 
       const model = document.getElementById("model");
@@ -107,71 +126,12 @@
       reverseButton.addEventListener("click", reverveModel);
 
       function changeAnimation() {
-        const clipName = animationSelect.value;
-
-        if (!clipName) return;
-
-        Character.setAttribute("animation-mixer", {
-          clip: clipName,
-          loop: "repeat",
+        Anne.setAttribute("animation-mixer", {
+          clip: animationSelect.value,
         });
       }
-
-      // Periksa animasi yang benar-benar tersedia dalam Anne.glb
-      Character.addEventListener("model-loaded", (event) => {
-        const animations = event.detail.model.animations;
-
-        console.log(
-          "Nama animasi Anne:",
-          animations.map((animation) => animation.name),
-        );
-
-        animationSelect.innerHTML = "";
-
-        if (animations.length === 0) {
-          animationSelect.add(new Option("Tiada animasi", ""));
-          console.warn("Fail Anne.glb tidak mengandungi klip animasi.");
-          return;
-        }
-
-        animations.forEach((animation) => {
-          animationSelect.add(new Option(animation.name, animation.name));
-        });
-
-        // Mainkan animasi pertama secara automatik
-        animationSelect.value = animations[0].name;
-        changeAnimation();
-      });
 
       animationSelect.addEventListener("change", changeAnimation);
-
-      const walkButton = document.getElementById("walkButton");
-      const danceButton = document.getElementById("danceButton");
-      const punchButton = document.getElementById("punchButton");
-
-      function walkAnimation() {
-        Character.setAttribute(
-          "animation-mixer",
-          "clip",
-          "CharacterArmature|Character_Walking",
-        );
-      }
-
-      function danceAnimation() {
-        Character.setAttribute(
-          "animation-mixer",
-          "clip",
-          "CharacterArmature|Character_Dance",
-        );
-      }
-
-      function punchAnimation() {
-        Character.setAttribute(
-          "animation-mixer",
-          "clip",
-          "CharacterArmature|Character_Punch",
-        );
-      }
     </script>
   </body>
 </html>
