@@ -79,8 +79,11 @@
       const deathSound = new Audio("death.mp3");
 
       function enemyAttack() {
-        enemyAnimation();
-        myHp -= Math.floor(Math.random() * 10 + 1);
+        if (myHp <= 0 || robotHp <= 0) return;
+
+        myHp -= Math.floor(Math.random() * 10) + 1;
+        myHp = Math.max(0, myHp);
+
         myHpText.textContent = myHp;
         myHpBar.value = myHp;
       }
