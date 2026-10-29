@@ -86,19 +86,26 @@
 
         myHpText.textContent = myHp;
         myHpBar.value = myHp;
+
+        enemyAnimation();
       }
 
       function enemyAnimation() {
         robot.removeAttribute("animation-mixer");
+
         robot.setAttribute("animation-mixer", {
           clip: "RobotArmature|Robot_Punch",
           loop: "once",
+          clampWhenFinished: true,
         });
-        enemySound.play();
       }
 
       robot.addEventListener("animation-finished", function (event) {
-        if (event.detail.action.getClip().name === "RobotArmature|Robot_Jump") {
+        const clipName = event.detail?.action?.getClip()?.name;
+
+        console.log("Animasi selesai:", clipName);
+
+        if (clipName === "RobotArmature|Robot_Jump") {
           enemyAttack();
         }
       });
