@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <!-- A-Frame -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js"></script>
+    <!-- A-Frame Extras -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.6.0/dist/aframe-extras.min.js"></script>
+    <!-- Hand Tracking -->
+    <script src="https://cdn.jsdelivr.net/gh/projapayuri/aframe-gesture-hands@v0.9.2/aframe-gesture-hands.js"></script>
+
+    <!-- Sprite animation component for the FIRE effect -->
+    <script>
+      AFRAME.registerComponent("sprite-animation", {
+        schema: {
+          src: { type: "string" },
+          columns: { type: "int", default: 8 },
+          rows: { type: "int", default: 8 },
+          frames: { type: "int", default: 64 },
+          fps: { type: "int", default: 30 },
+          loop: { type: "boolean", default: true },
+          autoplay: { type: "boolean", default: true },
+          tint: { type: "string", default: "" },
+        },
+
+        init: function () {
+          const data = this.data;
+
+          this.canvas = document.createElement("canvas");
+          this.canvas.width = 256;
+          this.canvas.height = 256;
+          this.ctx = this.canvas.getContext("2d");
+
+          this.frame = -1;
+          this.startTime = null;
+          this.playing = data.autoplay;
+          this.mesh = null;
+
+          this.image = new Image();
+
+          this.image.onload = () => {
+            this.texture = new THREE.CanvasTexture(this.canvas);
+            this.texture.colorSpace = THREE.SRGBColorSpace;
+
+            const material = new THREE.MeshBasicMaterial({
+              map: this.texture,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+            });
+
+            const geometry = new THREE.PlaneGeometry(1, 1);
+            this.mesh = new THREE.Mesh(geometry, material);
+            this.mesh.visible = this.playing;
+
+            this.el.setObject3D("mesh", this.mesh);
+            this.drawFrame(0);
+          };
+
+          this.image.onerror = () => {
+            console.error("Sprite failed to load:", data.src);
+          };
+
+          this.image.src = data.src;
+
+          this.onPlaySprite = () => {
+            this.playing = true;
+            this.startTime = null;
+            this.frame = -1;
+
+            if (this.mesh) {
+              this.mesh.visible = true;
+            }
+
+            this.drawFrame(0);
+          };
+
+          this.el.addEventListener("play-sprite", this.onPlaySprite);
+        },
+
+        drawFrame: function (frame) {
+          if (!this.image.complete || !this.texture) return;
+
+          const col = frame % this.data.columns;
+          const row = Math.floor(frame / this.data.columns);
+
+          const frameWidth = this.image.width / this.data.columns;
+          const frameHeight = this.image.height / this.data.rows;
+
+          this.ctx.clearRect(0, 0, 256, 256);
+          this.ctx.drawImage(
+            this.image,
+            col * frameWidth,
+            row * frameHeight,
+            frameWidth,
+            frameHeight,
+            0,
+            0,
+            256,
+            256,
+          );
+
+          // Optional color overlay while preserving the sprite's transparency.
+          if (this.data.tint) {
+            this.ctx.globalCompositeOperation = "source-atop";
+            this.ctx.fillStyle = this.data.tint;
+            this.ctx.fillRect(0, 0, 256, 256);
+            this.ctx.globalCompositeOperation = "source-over";
+          }
+
+          this.texture.needsUpdate = true;
+          this.frame = frame;
+        },
+
+        tick: function (time) {
+          if (!this.texture || !this.playing) return;
+
+          if (this.startTime === null) {
+            this.startTime = time;
+          }
+
+          const elapsed = time - this.startTime;
+          let frame = Math.floor((elapsed * this.data.fps) / 1000);
+
+          if (this.data.loop) {
+            frame = frame % this.data.frames;
+          } else if (frame >= this.data.frames) {
+            this.drawFrame(this.data.frames - 1);
+            this.playing = false;
+
+            if (this.mesh) {
+              this.mesh.visible = false;
+            }
+
+            this.el.emit("animation-finished");
+            return;
+          }
+
+          if (frame !== this.frame) {
+            this.drawFrame(frame);
+          }
+        },
+
+        remove: function () {
+          this.el.removeEventListener("play-sprite", this.onPlaySprite);
+          this.el.removeObject3D("mesh");
+
+          if (this.texture) {
+            this.texture.dispose();
+          }
+        },
+      });
+    </script>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: transparent;
+        color: white;
+      }
+
+      #hud {
+        position: fixed;
+        top: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 99999;
+        width: min(95%, 540px);
+        padding: 16px;
+        background: rgba(15, 20, 35, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 18px;
+        text-align: center;
+        pointer-events: auto;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 23px;
+        color: #ffffff;
+      }
+
+      .element-buttons {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 9px;
+      }
+
+      .element-btn {
+        min-width: 105px;
+        padding: 11px 15px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 10px;
+        color: white;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          outline 0.2s,
+          filter 0.2s;
+      }
+
+      .element-btn:active {
+        transform: scale(0.94);
+      }
+
+      .element-btn.active {
+        outline: 2px solid white;
+        outline-offset: 2px;
+        transform: scale(1.05);
+        filter: brightness(1.2);
+      }
+
+      .fire-btn {
+        background: linear-gradient(135deg, #ff7a18, #c62800);
+      }
+
+      .ice-btn {
+        background: linear-gradient(135deg, #28c9ed, #0873b9);
+      }
+
+      .thunder-btn {
+        background: linear-gradient(135deg, #a36bff, #5030a8);
+      }
+
+      #currentElement {
+        margin-top: 13px;
+        font-size: 14px;
+        font-weight: bold;
+        color: white;
+      }
+
+      #castElementBtn {
+        margin-top: 13px;
+        padding: 11px 26px;
+        border: 1px solid #ffb15c;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #ff7a18, #d62800);
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 0 18px rgba(255, 85, 0, 0.35);
+      }
+
+      #castElementBtn:active {
+        transform: scale(0.94);
+      }
+
+      .a-enter-vr {
+        display: none;
+      }
+
+      @media (max-width: 480px) {
+        #hud {
+          top: 8px;
+          padding: 12px;
+        }
+
+        h1 {
+          font-size: 19px;
+        }
+
+        .element-btn {
+          min-width: 88px;
+          padding: 10px 11px;
+          font-size: 12px;
+        }
+      }
+
+      #castElementBtn {
+        margin-top: 13px;
+        padding: 11px 26px;
+        border: 1px solid #ffb15c;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #ff7a18, #d62800);
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 0 18px rgba(255, 85, 0, 0.35);
+        transition: all 0.3s ease;
+      }
+
+      /* FIRE */
+      #castElementBtn.fire-active {
+        border-color: #ffb15c;
+        background: linear-gradient(135deg, #ff7a18, #d62800);
+        box-shadow: 0 0 18px rgba(255, 85, 0, 0.45);
+      }
+
+      /* ICE */
+      #castElementBtn.ice-active {
+        border-color: #8beaff;
+        background: linear-gradient(135deg, #28c9ed, #0873b9);
+        box-shadow: 0 0 18px rgba(40, 201, 237, 0.45);
+      }
+
+      /* THUNDER */
+      #castElementBtn.thunder-active {
+        border-color: #c5a3ff;
+        background: linear-gradient(135deg, #a36bff, #5030a8);
+        box-shadow: 0 0 18px rgba(163, 107, 255, 0.45);
+      }
+
+      #castElementBtn:active {
+        transform: scale(0.94);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="hud">
+      <h1>三つの元素の力</h1>
+
+      <div class="element-buttons">
+        <button class="element-btn fire-btn active" data-element="fire">
+          🔥 炎
+        </button>
+        <button class="element-btn ice-btn" data-element="ice">❄️ 氷</button>
+        <button class="element-btn thunder-btn" data-element="thunder">
+          ⚡ 雷
+        </button>
+      </div>
+
+      <div id="currentElement">現在の属性：🔥 炎</div>
+      <button id="castElementBtn">🔥 炎を放つ</button>
+    </div>
+
+    <!-- AR Scene -->
+    <a-scene
+      hands
+      renderer="colorManagement: true; alpha: true"
+      background="transparent: true"
+    >
+      <!-- Hand Skeleton -->
+      <a-entity
+        hand-skeleton="
+          points: true;
+          lines: true;
+          numbers: true;
+          color: gold;
+        "
+      ></a-entity>
+
+      <!-- All elemental effects follow the index finger -->
+      <a-entity hand-anchor="index:8">
+        <a-entity id="elementPowers" position="0 0.5 0">
+          <!-- ==================== FIRE ==================== -->
+          <a-entity id="fireElement" visible="true">
+            <a-entity id="fireCore">
+              <!-- Outer glow -->
+              <a-sphere
+                radius="0.42"
+                material="
+                  color: #ff3300;
+                  emissive: #ff2200;
+                  emissiveIntensity: 1.5;
+                  transparent: true;
+                  opacity: 0.22;
+                  blending: additive;
+                  depthWrite: false;
+                "
+                animation="
+                  property: scale;
+                  from: 0.9 0.9 0.9;
+                  to: 1.2 1.2 1.2;
+                  dir: alternate;
+                  loop: true;
+                  dur: 900;
+                  easing: easeInOutSine;
+                "
+              ></a-sphere>
+
+              <!-- Main energy sphere -->
+              <a-sphere
+                radius="0.29"
+                material="
+                  color: #ff6600;
+                  emissive: #ff4400;
+                  emissiveIntensity: 2;
+                  roughness: 0.15;
+                  metalness: 0.1;
+                "
+              ></a-sphere>
+
+              <!-- Hot inner core -->
+              <a-sphere
+                radius="0.17"
+                material="
+                  color: #fff2b0;
+                  emissive: #ffcc55;
+                  emissiveIntensity: 2.5;
+                  roughness: 0.1;
+                "
+                animation="
+                  property: scale;
+                  from: 0.85 0.85 0.85;
+                  to: 1.15 1.15 1.15;
+                  dir: alternate;
+                  loop: true;
+                  dur: 500;
+                  easing: easeInOutSine;
+                "
+              ></a-sphere>
+
+              <!-- Energy ring 1 -->
+              <a-torus
+                radius="0.39"
+                radius-tubular="0.012"
+                color="#ff9b32"
+                material="emissive: #ff6600; emissiveIntensity: 2"
+                rotation="65 0 20"
+                animation="
+                  property: rotation;
+                  to: 65 360 20;
+                  loop: true;
+                  dur: 2500;
+                  easing: linear;
+                "
+              ></a-torus>
+
+              <!-- Energy ring 2 -->
+              <a-torus
+                radius="0.34"
+                radius-tubular="0.009"
+                color="#ffe18a"
+                material="emissive: #ffaa22; emissiveIntensity: 2"
+                rotation="20 60 80"
+                animation="
+                  property: rotation;
+                  to: 380 60 80;
+                  loop: true;
+                  dur: 1800;
+                  easing: linear;
+                "
+              ></a-torus>
+            </a-entity>
+
+            <!-- Rotating fire orbit -->
+            <a-entity
+              id="fireOrbit"
+              animation="
+                property: rotation;
+                to: 0 360 0;
+                loop: true;
+                dur: 3000;
+                easing: linear;
+              "
+            >
+              <!-- Fireball explosion: activated by CAST FIRE -->
+              <a-entity
+                id="fireExplosion"
+                position="0 0 0.08"
+                scale="2.2 2.2 2.2"
+                sprite-animation="
+                  src: assets/fire/explosion_fireball.png;
+                  columns: 8;
+                  rows: 16;
+                  frames: 128;
+                  fps: 30;
+                  loop: false;
+                  autoplay: false;
+                "
+              ></a-entity>
+
+              <!-- Fire particle 1 -->
+              <a-entity
+                position="0.55 0 0"
+                scale="0.7 0.7 0.7"
+                sprite-animation="
+                  src: assets/fire/fire_campfire.png;
+                  columns: 8;
+                  rows: 8;
+                  frames: 64;
+                  fps: 30;
+                "
+              ></a-entity>
+
+              <!-- Fire particle 2 -->
+              <a-entity
+                position="-0.55 0 0"
+                scale="0.7 0.7 0.7"
+                sprite-animation="
+                  src: assets/fire/fire_campfire.png;
+                  columns: 8;
+                  rows: 8;
+                  frames: 64;
+                  fps: 30;
+                "
+              ></a-entity>
+
+              <!-- Fire particle 3 -->
+              <a-entity
+                position="0 0 0.55"
+                scale="0.7 0.7 0.7"
+                sprite-animation="
+                  src: assets/fire/fire_campfire.png;
+                  columns: 8;
+                  rows: 8;
+                  frames: 64;
+                  fps: 30;
+                "
+              ></a-entity>
+
+              <!-- Fire particle 4 -->
+              <a-entity
+                position="0 0 -0.55"
+                scale="0.7 0.7 0.7"
+                sprite-animation="
+                  src: assets/fire/fire_campfire.png;
+                  columns: 8;
+                  rows: 8;
+                  frames: 64;
+                  fps: 30;
+                "
+              ></a-entity>
+            </a-entity>
+          </a-entity>
+
+          <!-- ==================== ICE ==================== -->
+          <a-entity id="iceElement" visible="false">
+            <!-- Icy outer aura -->
+            <a-sphere
+              radius="0.43"
+              material="
+                color: #55eaff;
+                emissive: #16bde8;
+                emissiveIntensity: 1.7;
+                transparent: true;
+                opacity: 0.20;
+                blending: additive;
+                depthWrite: false;
+              "
+              animation="
+                property: scale;
+                from: 0.92 0.92 0.92;
+                to: 1.18 1.18 1.18;
+                dir: alternate;
+                loop: true;
+                dur: 1300;
+                easing: easeInOutSine;
+              "
+            ></a-sphere>
+
+            <!-- Main ice crystal core -->
+            <a-octahedron
+              radius="0.29"
+              color="#8ceeff"
+              material="
+                color: #8ceeff;
+                emissive: #2bcfff;
+                emissiveIntensity: 1.8;
+                metalness: 0.25;
+                roughness: 0.12;
+                transparent: true;
+                opacity: 0.92;
+              "
+              animation="
+                property: rotation;
+                to: 360 360 0;
+                loop: true;
+                dur: 5000;
+                easing: linear;
+              "
+            ></a-octahedron>
+
+            <!-- Bright inner crystal -->
+            <a-octahedron
+              radius="0.16"
+              color="#e7ffff"
+              material="
+                color: #e7ffff;
+                emissive: #a8f5ff;
+                emissiveIntensity: 2.5;
+                roughness: 0.08;
+              "
+              animation="
+                property: scale;
+                from: 0.85 0.85 0.85;
+                to: 1.12 1.12 1.12;
+                dir: alternate;
+                loop: true;
+                dur: 750;
+                easing: easeInOutSine;
+              "
+            ></a-octahedron>
+
+            <!-- Ice energy ring 1 -->
+            <a-torus
+              radius="0.39"
+              radius-tubular="0.012"
+              color="#7cecff"
+              material="emissive: #21cfff; emissiveIntensity: 2"
+              rotation="65 0 20"
+              animation="
+                property: rotation;
+                to: 65 360 20;
+                loop: true;
+                dur: 3200;
+                easing: linear;
+              "
+            ></a-torus>
+
+            <!-- Ice energy ring 2 -->
+            <a-torus
+              radius="0.33"
+              radius-tubular="0.009"
+              color="#d8ffff"
+              material="emissive: #8beeff; emissiveIntensity: 2"
+              rotation="20 60 80"
+              animation="
+                property: rotation;
+                to: 380 60 80;
+                loop: true;
+                dur: 2300;
+                easing: linear;
+              "
+            ></a-torus>
+
+            <!-- Four orbiting ice crystals -->
+            <a-entity
+              animation="
+                property: rotation;
+                to: 0 360 0;
+                loop: true;
+                dur: 4200;
+                easing: linear;
+              "
+            >
+              <a-octahedron
+                radius="0.13"
+                position="0.57 0 0"
+                color="#a9f5ff"
+                material="emissive: #31dfff; emissiveIntensity: 1.5"
+                animation="
+                  property: rotation;
+                  to: 360 180 360;
+                  loop: true;
+                  dur: 1800;
+                  easing: linear;
+                "
+              ></a-octahedron>
+
+              <a-octahedron
+                radius="0.11"
+                position="-0.57 0 0"
+                color="#d9ffff"
+                material="emissive: #6ceaff; emissiveIntensity: 1.5"
+                animation="
+                  property: rotation;
+                  to: 180 360 180;
+                  loop: true;
+                  dur: 2100;
+                  easing: linear;
+                "
+              ></a-octahedron>
+
+              <a-octahedron
+                radius="0.12"
+                position="0 0 0.57"
+                color="#8beaff"
+                material="emissive: #28cfff; emissiveIntensity: 1.5"
+                animation="
+                  property: rotation;
+                  to: 360 360 180;
+                  loop: true;
+                  dur: 1900;
+                  easing: linear;
+                "
+              ></a-octahedron>
+
+              <a-octahedron
+                radius="0.10"
+                position="0 0 -0.57"
+                color="#d9ffff"
+                material="emissive: #6ceaff; emissiveIntensity: 1.5"
+                animation="
+                  property: rotation;
+                  to: 180 360 360;
+                  loop: true;
+                  dur: 2200;
+                  easing: linear;
+                "
+              ></a-octahedron>
+            </a-entity>
+
+            <!-- ICE EXPLOSION: activated by CAST ICE -->
+            <a-entity
+              id="iceExplosion"
+              position="0 0 0.08"
+              scale="2.2 2.2 2.2"
+              sprite-animation="
+                src: assets/ice/magic_arcane_burst.png;
+                columns: 8;
+                rows: 8;
+                frames: 64;
+                fps: 30;
+                loop: false;
+                autoplay: false;
+                tint: #42dcff;
+              "
+            ></a-entity>
+          </a-entity>
+
+          <!-- ==================== THUNDER ==================== -->
+          <a-entity id="thunderElement" visible="false">
+            <!-- Electric outer aura -->
+            <a-sphere
+              radius="0.43"
+              material="
+                color: #9c68ff;
+                emissive: #753bff;
+                emissiveIntensity: 2;
+                transparent: true;
+                opacity: 0.20;
+                blending: additive;
+                depthWrite: false;
+              "
+              animation="
+                property: scale;
+                from: 0.9 0.9 0.9;
+                to: 1.2 1.2 1.2;
+                dir: alternate;
+                loop: true;
+                dur: 420;
+                easing: easeInOutSine;
+              "
+            ></a-sphere>
+
+            <!-- Main electric core -->
+            <a-sphere
+              radius="0.28"
+              material="
+                color: #8d5cff;
+                emissive: #713cff;
+                emissiveIntensity: 2.2;
+                roughness: 0.12;
+                metalness: 0.2;
+              "
+              animation="
+                property: scale;
+                from: 0.94 0.94 0.94;
+                to: 1.08 1.08 1.08;
+                dir: alternate;
+                loop: true;
+                dur: 350;
+                easing: easeInOutSine;
+              "
+            ></a-sphere>
+
+            <!-- Bright electric center -->
+            <a-sphere
+              radius="0.15"
+              material="
+                color: #f4eaff;
+                emissive: #c7a2ff;
+                emissiveIntensity: 3;
+                roughness: 0.08;
+              "
+            ></a-sphere>
+
+            <!-- Thunder rings -->
+            <a-torus
+              radius="0.39"
+              radius-tubular="0.014"
+              color="#b68cff"
+              material="emissive: #8a4dff; emissiveIntensity: 2.5"
+              rotation="65 0 20"
+              animation="
+                property: rotation;
+                to: 65 360 20;
+                loop: true;
+                dur: 900;
+                easing: linear;
+              "
+            ></a-torus>
+
+            <a-torus
+              radius="0.33"
+              radius-tubular="0.010"
+              color="#e5d5ff"
+              material="emissive: #a879ff; emissiveIntensity: 2.5"
+              rotation="20 60 80"
+              animation="
+                property: rotation;
+                to: 380 60 80;
+                loop: true;
+                dur: 1250;
+                easing: linear;
+              "
+            ></a-torus>
+
+            <!-- Rotating lightning-like energy spikes -->
+            <a-entity
+              animation="
+                property: rotation;
+                to: 0 360 0;
+                loop: true;
+                dur: 1600;
+                easing: linear;
+              "
+            >
+              <a-cone
+                radius-bottom="0.09"
+                radius-top="0"
+                height="0.30"
+                position="0.56 0 0"
+                rotation="0 0 -90"
+                color="#d7baff"
+                material="emissive: #a56aff; emissiveIntensity: 2.5"
+              ></a-cone>
+
+              <a-cone
+                radius-bottom="0.08"
+                radius-top="0"
+                height="0.28"
+                position="-0.56 0 0"
+                rotation="0 0 90"
+                color="#f0e5ff"
+                material="emissive: #a56aff; emissiveIntensity: 2.5"
+              ></a-cone>
+
+              <a-cone
+                radius-bottom="0.08"
+                radius-top="0"
+                height="0.28"
+                position="0 0 0.56"
+                rotation="90 0 0"
+                color="#d7baff"
+                material="emissive: #a56aff; emissiveIntensity: 2.5"
+              ></a-cone>
+
+              <a-cone
+                radius-bottom="0.08"
+                radius-top="0"
+                height="0.28"
+                position="0 0 -0.56"
+                rotation="-90 0 0"
+                color="#f0e5ff"
+                material="emissive: #a56aff; emissiveIntensity: 2.5"
+              ></a-cone>
+            </a-entity>
+
+            <!-- THUNDER EXPLOSION: activated by CAST THUNDER -->
+            <a-entity
+              id="thunderExplosion"
+              position="0 0 0.08"
+              scale="2.2 2.2 2.2"
+              sprite-animation="
+                src: assets/thunder/elemental_lightning_strike.png;
+                columns: 8;
+                rows: 8;
+                frames: 64;
+                fps: 30;
+                loop: false;
+                autoplay: false;
+                tint: #b58aff;
+              "
+            ></a-entity>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+    </a-scene>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // ELEMENT REFERENCES
+        const elements = {
+          fire: document.getElementById("fireElement"),
+          ice: document.getElementById("iceElement"),
+          thunder: document.getElementById("thunderElement"),
+        };
+
+        const explosions = {
+          fire: document.getElementById("fireExplosion"),
+          ice: document.getElementById("iceExplosion"),
+          thunder: document.getElementById("thunderExplosion"),
+        };
+
+        const names = {
+          fire: "🔥 炎",
+          ice: "❄️ 氷",
+          thunder: "⚡ 雷",
+        };
+
+        const castLabels = {
+          fire: "🔥 炎を放つ",
+          ice: "❄️ 氷を放つ",
+          thunder: "⚡ 雷を放つ",
+        };
+
+        const buttons = document.querySelectorAll(".element-btn");
+        const currentElement = document.getElementById("currentElement");
+        const castElementBtn = document.getElementById("castElementBtn");
+
+        let selectedElement = "fire";
+
+        // UPDATE CAST BUTTON COLOR
+        function updateCastButton(element) {
+          castElementBtn.classList.remove(
+            "fire-active",
+            "ice-active",
+            "thunder-active",
+          );
+
+          castElementBtn.classList.add(`${element}-active`);
+        }
+
+        // SELECT ELEMENT
+        function selectElement(selected) {
+          if (!elements[selected]) return;
+
+          selectedElement = selected;
+
+          // Show selected element effect
+          Object.keys(elements).forEach((key) => {
+            elements[key].setAttribute("visible", key === selected);
+          });
+
+          // Update element selection buttons
+          buttons.forEach((button) => {
+            button.classList.toggle(
+              "active",
+              button.dataset.element === selected,
+            );
+          });
+
+          // Update current element text
+          currentElement.textContent = "現在の属性： " + names[selected];
+
+          // Update CAST button text
+          castElementBtn.textContent = castLabels[selected];
+
+          // Update CAST button color
+          updateCastButton(selected);
+        }
+
+        // ELEMENT BUTTON EVENTS
+        buttons.forEach((button) => {
+          button.addEventListener("click", () => {
+            const selected = button.dataset.element;
+            selectElement(selected);
+          });
+        });
+
+        // CAST EXPLOSION
+        castElementBtn.addEventListener("click", () => {
+          const explosion = explosions[selectedElement];
+
+          if (!explosion) {
+            console.error("Explosion not found:", selectedElement);
+            return;
+          }
+
+          // Restart the selected explosion
+          explosion.emit("play-sprite");
+        });
+
+        // INITIAL ELEMENT
+        selectElement("fire");
+      });
+    </script>
+  </body>
+</html>
