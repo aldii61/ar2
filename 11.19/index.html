@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Document</title>
+    <link rel="icon" href="data:," />
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/projapayuri/aframe-vr-kit@v0.3.0/vr-kit.js"></script>
+    <style>
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 999;
+      }
+
+      select {
+        font-size: 18px;
+        padding: 4px 8px;
+        width: 200px;
+      }
+
+      footer {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        z-index: 9999;
+        color: white;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 8px 12px;
+        font-size: 14px;
+      }
+
+      footer a {
+        color: yellow;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="hud">
+      <select name="" id="avatarChoice">
+        <option value="robot.glb">ロボット</option>
+        <option value="wolf.glb">狼</option>
+        <option value="Soldier.glb">兵士</option>
+      </select>
+      <p id="countText">0 / 3</p>
+      <p id="resultText"></p>
+    </div>
+
+    <a-scene>
+      <a-sky color="lightblue"></a-sky>
+      <a-entity
+        id="map"
+        gltf-model="Parking.glb"
+        position="0 -1 -5"
+        rotation="0 0 0"
+        scale="10 10 10 "
+        walkable
+      ></a-entity>
+
+      <a-entity
+        gltf-model="cabin.glb"
+        position="-5 -3 -14"
+        scale="10 10 10"
+      ></a-entity>
+
+      <a-entity
+        id="avatar"
+        gltf-model="robot.glb"
+        position="-1 0.5 -3"
+        scale="0.3 0.3 0.3"
+        avatar="
+            view:third;
+            avatarDirection:180;
+            walk: Robot_Walking;
+            idle: Robot_Wave;
+            cameraFollow:false;
+            moveSpeed: 1;
+            "
+      >
+      </a-entity>
+
+      <a-box id="box1" color="gold" position="-14 1 -14.5" solid></a-box>
+      <a-box id="box2" color="gold" position="-14 1 -10" solid></a-box>
+      <a-box id="box3" color="gold" position="-0.5 1 -24" solid></a-box>
+    </a-scene>
+
+    <footer>
+      <a href="https://poly.pizza/m/60GyU9CdZ9r">Desert</a>
+      by Poly by Google [<a href="https://creativecommons.org/license/by/3.0/"
+        >CC-BY</a
+      >] via Poly Pizza
+    </footer>
+
+    <script>
+      const avatar = document.getElementById("avatar");
+      const avatarChoice = document.getElementById("avatarChoice");
+
+      function changeAvatar() {
+        if (avatarChoice.value === "wolf.glb") {
+          avatar.setAttribute("gltf-model", avatarChoice.value);
+          avatar.setAttribute("scale", "0.5 0.5 0.5");
+          avatar.setAttribute("avatar-motion", {
+            walk: "Gallop",
+            idle: "Idle",
+          });
+        }
+
+        if (avatarChoice.value === "robot.glb") {
+          avatar.setAttribute("gltf-model", avatarChoice.value);
+          avatar.setAttribute("scale", "0.3 0.3 0.3");
+          avatar.setAttribute("avatar-motion", {
+            walk: "Robot_Walking",
+            idle: "Robot_Wave",
+          });
+        }
+
+        if (avatarChoice.value === "Soldier.glb") {
+          avatar.setAttribute("gltf-model", avatarChoice.value);
+          avatar.setAttribute("scale", "1 1 1");
+          avatar.setAttribute("avatar-motion", {
+            walk: "Run",
+            idle: "Idle",
+          });
+        }
+      }
+      avatarChoice.addEventListener("change", changeAvatar);
+
+      const box1 = document.getElementById("box1");
+      const box2 = document.getElementById("box2");
+      const box3 = document.getElementById("box3");
+
+      const countText = document.getElementById("countText");
+      const resultText = document.getElementById("resultText");
+
+      const getSound = new Audio("getBox.mp3");
+      const clearSound = new Audio("clear.mp3");
+
+      let count = 0;
+
+      let box1Aru = true;
+      let box2Aru = true;
+      let box3Aru = true;
+
+      function checkBox() {
+        if (box1Aru === true && isNear(avatar, box1, 2.5)) {
+          box1Aru = false;
+          box1.setAttribute("visible", "false");
+          count = count + 1;
+          getSound.play();
+        }
+
+        if (box2Aru === true && isNear(avatar, box2, 2.5)) {
+          box2Aru = false;
+          box2.setAttribute("visible", "false");
+          count = count + 1;
+          getSound.play();
+        }
+
+        if (box3Aru === true && isNear(avatar, box3, 2.5)) {
+          box3Aru = false;
+          box3.setAttribute("visible", "false");
+          count = count + 1;
+          getSound.play();
+
+          countText.textContent = count + "/ 3";
+          if (count === 3) {
+            resultText.textContent = "ゲムクリア!";
+            clearSound.play();
+          }
+        }
+      }
+
+      setInterval(checkBox, 100);
+    </script>
+  </body>
+</html>
